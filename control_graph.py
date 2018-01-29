@@ -1,7 +1,10 @@
 
-
 def skip(variable_list):
     return variable_list
+
+
+
+
 
 
 class Node:
@@ -56,7 +59,15 @@ class ControlGraph:
         variable_list = input
         next_node = self.rootnode
 
-        while next_node != None:
+        while next_node is not None:
+            next_node, variable_list = affectations(next_node, variable_list)
+
+        return variable_list
+
+
+
+
+
 
 
 
