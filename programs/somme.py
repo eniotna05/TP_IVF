@@ -1,7 +1,7 @@
-from control_flow_graph.condition_list import *
 from control_flow_graph.affectation_list import *
 from control_flow_graph.control_graph import *
 from control_flow_graph.result_fonctions import *
+from control_flow_graph.condition_list import *
 
 
 list_of_node = [AffectationNode(1,Somme(0,[0,1])), EndNode(2, Imprimer(0))]

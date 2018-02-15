@@ -1,3 +1,4 @@
+
 class AlwaysTrue:
     def __init__(self):
         pass

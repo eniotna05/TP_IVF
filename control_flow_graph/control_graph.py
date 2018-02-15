@@ -1,12 +1,10 @@
-from copy import deepcopy
-
 from control_flow_graph.affectation_list import *
 from control_flow_graph.condition_list import *
 from control_flow_graph.result_fonctions import *
 
 class Node:
 
-    def __init__(self, id, condition, affectations, true_children, false_children):
+    def __init__(self, id, condition, affectations):
 
         self.condition = condition
         self.true = None
@@ -14,37 +12,44 @@ class Node:
         self.affectations = affectations
         self.id = id
 
+    def __str__(self):
+        return "Node " + str(self.id)
+
 class ConditionNode(Node):
 
-    def __init__(self, id, condition, while_loop = True):
+    def __init__(self, id, condition, while_loop=False):
 
-        self.condition = condition
-        self.true = None
-        self.false = None
-        self.affectations = Skip()
-        self.id = id
+        super().__init__(id=id, condition=condition, affectations=Skip())
+
+        # used for all affectation criteria
+        self.true_covered = False
+        self.false_covered = False
+
+        # used  for loop criteria
         self.while_loop = while_loop
+
+    def __str__(self):
+        return "Cond Node " + str(self.id)
 
 
 class AffectationNode(Node):
 
     def __init__(self, id, affectations):
-        self.condition = AlwaysTrue()
-        self.true = None
-        self.false = None
-        self.affectations = affectations
-        self.id = id
+        super().__init__(id=id, condition=AlwaysTrue(), affectations=affectations)
+
+    def __str__(self):
+        return "Aff Node " + str(self.id)
 
 
 class EndNode(Node):
 
     def __init__(self, id, result_function):
-        self.condition = AlwaysTrue()
-        self.true = None
-        self.false = None
-        self.affectations = Skip()
-        self.id = id
+        super().__init__(id=id, condition=AlwaysTrue(), affectations=Skip())
         self.result = result_function
+
+    def __str__(self):
+        return "End Node " + str(self.id)
+
 
 class ControlGraph:
 
@@ -55,12 +60,14 @@ class ControlGraph:
         self.number_of_input_var = number_of_input_var
         self.number_of_total_var = number_of_total_var
 
-        self.to_cover = None
+        self.covered = None
+        self.non_covered = None
+
         self.path_size = None
 
         for relation in relationships:
             node = self.fetch_node(relation[0])
-            if relation[2] == True:
+            if relation[2] is True:
                 node.true = self.fetch_node(relation[1])
             else:
                 node.false = self.fetch_node(relation[1])
@@ -70,15 +77,13 @@ class ControlGraph:
             if node.id == id:
                 return node
 
-
-    def go_through_node(self, node,  variable_list):
-
-        if node.condition.test(variable_list) is True:
+    def go_through_node(self, node, vlist):
+        if node.condition.test(vlist) is True:
             next_node = node.true
         else:
             next_node = node.false
-        variable_list = node.affectations.run(variable_list)
-        return next_node, variable_list
+        vlist = node.affectations.run(vlist)
+        return next_node, vlist
 
     def function_run(self, input, criteria=None, explicit=True):
 
@@ -100,15 +105,31 @@ class ControlGraph:
             #All affectation criteria
             if criteria == "affectation":
                 if not isinstance(current_node.affectations, Skip):
-                    self.to_cover[current_node] = True
+                    if current_node in self.non_covered:
+                        self.non_covered.remove(current_node)
+                        self.covered.append(current_node)
 
             #All decisions criteria
             if criteria == "decision":
                 if not isinstance(current_node.condition, AlwaysTrue):
-                    self.to_cover[current_node].append(current_node.condition.test(variable_list))
-                    #On ajoute le resultat du chemin emprunté par la condition (True ou False)
+                    if current_node in self.non_covered:
+                        if current_node.condition.test(variable_list) is True:
+                            current_node.true_covered = True
+                        if current_node.condition.test(variable_list) is False:
+                            current_node.false_covered = True
+                        if current_node.true_covered is True and current_node.false_covered is True:
+                            self.non_covered.remove(current_node)
+                            self.covered.append(current_node)
+
+            #K path critteria
+            if criteria == "k_path":
+                self.function_path.append(current_node.id)
 
             current_node, variable_list = self.go_through_node(current_node, variable_list)
+
+        # K path critteria (final node)
+        if criteria == "k_path":
+            self.function_path.append(current_node.id)
 
         if explicit is True:
             print("node number = " + str(current_node.id) )
@@ -116,91 +137,91 @@ class ControlGraph:
             print("Result of function below")
             current_node.result.run(variable_list)
 
+        if criteria == "k_path":
+            print(self.function_path)
         return variable_list
 
     def cover_analysis_affectation(self, data_set, explicit=True):
 
-        self.to_cover = {}
+        self.covered = []
+        self.non_covered = []
 
         for node in self.list_of_node:
             if not isinstance(node.affectations, Skip):
-                self.to_cover[node] = False
+                self.non_covered.append(node)
 
         for input in data_set:
             self.function_run(list(input), "affectation", explicit)
 
-        cover_percentage, non_covered = self.cover_count()
-        print("# of elements to cover: " + str(len(self.to_cover)))
-        print("Cover percentage :" + str(cover_percentage))
-        print("Non covered :" + str(non_covered))
 
+
+        return self.cover_analysis_result()
 
     def cover_analysis_decision(self, data_set, explicit=True):
 
-        self.to_cover = {}
+        self.covered = []
+        self.non_covered = []
 
         for node in self.list_of_node:
             if not isinstance(node.condition, AlwaysTrue):
-                self.to_cover[node] = []
+                self.non_covered.append(node)
 
         for input in data_set:
             self.function_run(list(input), "decision", explicit)
 
-        for cle, valeur in self.to_cover.items():
-            if True in valeur and False in valeur:
-            #Pour chaque noeud de condition le critere est couvert
-            #  si les chemin True et False ont tout deux été emprunté
-                self.to_cover[cle] = True
-            else:
-                self.to_cover[cle] = False
+        # condition nodes are reinitialized
+        for node in self.list_of_node:
+            if not isinstance(node.condition, AlwaysTrue):
+                node.true_covered = False
+                node.false_covered = False
 
-        cover_percentage, non_covered = self.cover_count()
-
-        print("# of elements to cover: " + str(len(self.to_cover)))
-        print("Cover percentage : " + str(cover_percentage))
-        print("Non covered : " + str(non_covered))
+        return self.cover_analysis_result()
 
     def cover_analysis_k_path(self, k,  data_set, explicit=True):
 
-        self.path_size = k
-        self.to_cover = {}
+        self.to_cover = []
 
         for node in self.list_of_node:
-            if not isinstance(node.condition, AlwaysTrue):
-                self.to_cover[node] = []
+            self.create_paths(k, node, [])
+
+        print(self.to_cover)
 
         for input in data_set:
-            self.function_run(list(input), "decision", explicit)
+            self.function_path = []
+            self.function_run(list(input), "k_path", explicit)
 
-        for cle, valeur in self.to_cover.items():
-            if True in valeur and False in valeur:
-            #Pour chaque noeud de condition le critere est couvert
-            #  si les chemin True et False ont tout deux été emprunté
-                self.to_cover[cle] = True
-            else:
-                self.to_cover[cle] = False
+        return self.cover_analysis_result()
 
-        cover_percentage, non_covered = self.cover_count()
+    def cover_analysis_result(self):
 
-        print("# of elements to cover: " + str(len(self.to_cover)))
-        print("Cover percentage : " + str(cover_percentage))
-        print("Non covered : " + str(non_covered))
-
-    def cover_count(self):
-
-        covered_count = 0
-        non_covered = []
-        for key, value in self.to_cover.items():
-            if value is True:
-                covered_count += 1
-            else:
-                non_covered.append(key.id)
-
-        if len(self.to_cover) == 0:
-            cover_percentage = "NA No items to cover"
+        if len(self.non_covered) + len(self.covered) == 0:
+            cover_percentage = "N.A. (No items to cover)"
         else:
-            cover_percentage = covered_count / len(self.to_cover)
-        return cover_percentage, non_covered
+            cover_percentage = len(self.covered) / (len(self.non_covered) + len(self.covered)) * 100
+
+        print("# of elements to cover: " + str(len(self.non_covered) + len(self.covered)))
+        print("Cover percentage : " + str(cover_percentage) + " %")
+        print("Non covered : " + str([str(x) for x in self.non_covered]) + "\n")
+
+        return cover_percentage, self.non_covered
+
+    def create_paths(self, max_size, node, current_path):
+        #function that is used to get all possible paths for the k_path cover analysis
+        #recursive function that adds all path starting from a node, of a maximum size
+        current_path.append(node.id)
+        self.to_cover.append((current_path, False))
+        if len(current_path) < max_size:
+            if node.true is not None:
+                self.create_paths(max_size, node.true, list(current_path))
+            if node.false is not None:
+                self.create_paths(max_size, node.false, list(current_path))
+
+
+
+
+
+
+
 
 
 
