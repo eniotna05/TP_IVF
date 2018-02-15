@@ -21,7 +21,7 @@ CFGmin.cover_analysis_decision(Dataset1, False)
 CFGmin.cover_analysis_decision(Dataset2, False)
 CFGmin.cover_analysis_decision(Dataset3, False)
 
-#CFGmin.cover_analysis_k_path(2, Dataset1, False)
+CFGmin.cover_analysis_k_path(2, Dataset1, False)
 
 
 

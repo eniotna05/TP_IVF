@@ -12,3 +12,6 @@ Dataset1 = [[1,4], [4,5], [7,9]]
 
 CFGsum.cover_analysis_affectation(Dataset1, False)
 CFGsum.cover_analysis_decision(Dataset1, False)
+
+CFGsum.cover_analysis_k_path(2, Dataset1, False)
+

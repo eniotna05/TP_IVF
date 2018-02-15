@@ -137,8 +137,6 @@ class ControlGraph:
             print("Result of function below")
             current_node.result.run(variable_list)
 
-        if criteria == "k_path":
-            print(self.function_path)
         return variable_list
 
     def cover_analysis_affectation(self, data_set, explicit=True):
@@ -152,8 +150,6 @@ class ControlGraph:
 
         for input in data_set:
             self.function_run(list(input), "affectation", explicit)
-
-
 
         return self.cover_analysis_result()
 
@@ -179,16 +175,24 @@ class ControlGraph:
 
     def cover_analysis_k_path(self, k,  data_set, explicit=True):
 
-        self.to_cover = []
+        self.covered = []
+        self.non_covered = []
 
         for node in self.list_of_node:
             self.create_paths(k, node, [])
 
-        print(self.to_cover)
+        print(self.non_covered)
 
         for input in data_set:
             self.function_path = []
             self.function_run(list(input), "k_path", explicit)
+            #print(self.function_path)
+            for path in self.non_covered:
+                #print(path)
+                #print(self.sublist(path, self.function_path))
+                if self.sublist(path, self.function_path):
+                    self.non_covered.remove(path)
+                    self.covered.append(path)
 
         return self.cover_analysis_result()
 
@@ -209,12 +213,38 @@ class ControlGraph:
         #function that is used to get all possible paths for the k_path cover analysis
         #recursive function that adds all path starting from a node, of a maximum size
         current_path.append(node.id)
-        self.to_cover.append((current_path, False))
+        self.non_covered.append(current_path)
         if len(current_path) < max_size:
             if node.true is not None:
                 self.create_paths(max_size, node.true, list(current_path))
             if node.false is not None:
                 self.create_paths(max_size, node.false, list(current_path))
+
+    def sublist(self, lst1, lst2):
+        #Checks if list1 is a sublist of list2
+        #Useful for k path cover analysist
+        result = False
+        curseur = 0
+        for element in lst2:
+            if result is False:
+                if element == lst1[0]:
+                    if len(lst1) == 1:
+                        return True
+                    result = True
+                    curseur += 1
+            if result is True:
+                if element == lst1[curseur]:
+                    if curseur == len(lst1) - 1:
+                        return True
+                    curseur += 1
+                else:
+                    curseur = 0
+                    result = False
+        return False
+
+
+
+
 
 
 
